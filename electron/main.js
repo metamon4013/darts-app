@@ -222,24 +222,31 @@ function startDartDataSimulation(webContents, deviceId) {
   // Clear any existing simulation
   stopDartDataSimulation(deviceId);
 
+  // Test data for Dartsio format
+  const testDartsioData = [
+    'S20', 'S01', 'S18', 'S04', 'S13', 'S06', 'S10', 'S15', 'S02', 'S17',
+    'S03', 'S19', 'S07', 'S16', 'S08', 'S11', 'S14', 'S09', 'S12', 'S05',
+    'D20', 'D01', 'D18', 'D04', 'D13', 'D06', 'D10', 'D15', 'D02', 'D17',
+    'T20', 'T19', 'T18', 'T17', 'T16', 'T15', 'T14', 'T13', 'T12', 'T11',
+    'B25', 'B50', 'S00'
+  ];
+
   // Simulate dart hits every 5-10 seconds for testing
   const interval = setInterval(() => {
     if (connectedDevices.has(deviceId)) {
-      // Generate random dart coordinates (simulating dart hits)
-      const x = Math.random() * 340 - 170; // -170 to 170
-      const y = Math.random() * 340 - 170; // -170 to 170
+      // Generate random Dartsio data for testing
+      const randomData = testDartsioData[Math.floor(Math.random() * testDartsioData.length)];
 
       const dartData = {
         deviceId,
-        x: Math.round(x * 10) / 10,  // Round to 1 decimal
-        y: Math.round(y * 10) / 10,  // Round to 1 decimal
+        rawData: randomData,
         timestamp: Date.now()
       };
 
       console.log('Sending dart data:', dartData);
       webContents.send('bluetooth-data', dartData);
     }
-  }, 8000); // Send data every 8 seconds for testing
+  }, 6000); // Send data every 6 seconds for testing
 
   simulationIntervals.set(deviceId, interval);
 }

@@ -33,7 +33,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* Header with Bluetooth Connection */}
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-4">
             <div className="flex items-center space-x-6">
               <Link href="/" className="text-xl font-bold hover:text-blue-400">
                 Dart Scorer
@@ -82,21 +82,17 @@ export default function Layout({ children }: LayoutProps) {
               </button>
             </div>
           </div>
+
+          {/* Data Monitor in Header */}
+          <div className="max-w-4xl mx-auto">
+            <DartsioDataDisplay isConnected={isConnected} compact={true} />
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            {children}
-          </div>
-
-          {/* Sidebar with Data Monitor */}
-          <div className="lg:col-span-1">
-            <DartsioDataDisplay isConnected={isConnected} />
-          </div>
-        </div>
+        {children}
       </div>
     </div>
   );

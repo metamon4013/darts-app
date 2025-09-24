@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseDartsioData } from '@/utils/dartsioParser';
 
 interface DartsioData {
   deviceId: string;
@@ -10,6 +11,7 @@ interface DartsioData {
 
 interface DartsioDataDisplayProps {
   isConnected: boolean;
+  compact?: boolean;
 }
 
 declare global {
@@ -23,7 +25,7 @@ declare global {
   }
 }
 
-export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayProps) {
+export default function DartsioDataDisplay({ isConnected, compact = false }: DartsioDataDisplayProps) {
   const [dataHistory, setDataHistory] = useState<DartsioData[]>([]);
   const [lastData, setLastData] = useState<DartsioData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -38,8 +40,18 @@ export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayPr
 
     const handleData = (event: any, data: DartsioData) => {
       console.log('Received Dartsio data:', data);
-      setLastData(data);
-      setDataHistory(prev => [...prev.slice(-19), data]); // Keep last 20 entries
+
+      // データを加工してパース結果も含める
+      const enhancedData = { ...data };
+      if (data.rawData) {
+        const parsedHit = parseDartsioData(data.rawData);
+        if (parsedHit) {
+          (enhancedData as any).parsedHit = parsedHit;
+        }
+      }
+
+      setLastData(enhancedData);
+      setDataHistory(prev => [...prev.slice(-19), enhancedData]); // Keep last 20 entries
       setErrorMessage('');
     };
 
@@ -69,6 +81,13 @@ export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayPr
   };
 
   if (!isConnected) {
+    if (compact) {
+      return (
+        <div className="bg-gray-700 p-2 rounded text-center">
+          <div className="text-sm text-gray-400">データモニター - 未接続</div>
+        </div>
+      );
+    }
     return (
       <div className="bg-gray-800 p-6 rounded-lg">
         <h2 className="text-xl font-bold mb-4">Dartsio データモニター</h2>
@@ -77,6 +96,51 @@ export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayPr
     );
   }
 
+  // コンパクト表示
+  if (compact) {
+    return (
+      <div className="bg-gray-700 p-2 rounded">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-green-400">データモニター</div>
+
+          {errorMessage ? (
+            <div className="text-xs text-red-400">エラー</div>
+          ) : lastData ? (
+            <div className="flex items-center space-x-3">
+              {/* 最新データの表示 */}
+              {(lastData as any).parsedHit ? (
+                <div className="flex items-center space-x-2">
+                  <div className="text-xs font-bold text-blue-300">
+                    {(lastData as any).parsedHit.displayText}
+                  </div>
+                  <div className="text-xs text-green-300">
+                    {(lastData as any).parsedHit.points}点
+                  </div>
+                </div>
+              ) : lastData.x !== undefined && lastData.y !== undefined ? (
+                <div className="text-xs text-white font-mono">
+                  X:{lastData.x} Y:{lastData.y}
+                </div>
+              ) : (
+                <div className="text-xs text-white font-mono">
+                  {lastData.rawData || 'データなし'}
+                </div>
+              )}
+
+              {/* 最新データの時刻 */}
+              <div className="text-xs text-gray-400">
+                {formatTimestamp(lastData.timestamp).slice(-8)}
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">データ待機中...</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 通常表示
   return (
     <div className="bg-gray-800 p-4 rounded-lg">
       <h2 className="text-lg font-bold mb-3">データモニター</h2>
@@ -90,15 +154,32 @@ export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayPr
       {lastData && (
         <div className="bg-gray-700 p-3 rounded mb-3">
           <h3 className="text-sm font-semibold mb-2 text-green-400">最新データ</h3>
-          {lastData.x !== undefined && lastData.y !== undefined ? (
+
+          {/* Dartsio形式のデータを優先表示 */}
+          {(lastData as any).parsedHit ? (
+            <div className="space-y-2">
+              <div className="text-white font-mono text-sm">
+                <div className="font-bold text-blue-300">
+                  {(lastData as any).parsedHit.displayText}
+                </div>
+                <div className="text-green-300">
+                  {(lastData as any).parsedHit.points}点 ({(lastData as any).parsedHit.type})
+                </div>
+              </div>
+              <div className="text-gray-400 text-xs">
+                生データ: {lastData.rawData}
+              </div>
+            </div>
+          ) : lastData.x !== undefined && lastData.y !== undefined ? (
             <div className="text-white font-mono text-sm">
               X: {lastData.x}, Y: {lastData.y}
             </div>
           ) : (
             <div className="text-white font-mono text-sm">
-              {lastData.rawData}
+              {lastData.rawData || 'データなし'}
             </div>
           )}
+
           <div className="text-gray-400 text-xs mt-1">
             {formatTimestamp(lastData.timestamp)}
           </div>
@@ -113,9 +194,11 @@ export default function DartsioDataDisplay({ isConnected }: DartsioDataDisplayPr
               <div key={`${data.timestamp}-${index}`} className="text-xs">
                 <span className="text-gray-400">{formatTimestamp(data.timestamp).slice(-8)}</span>
                 <span className="ml-2 text-white font-mono">
-                  {data.x !== undefined && data.y !== undefined
+                  {(data as any).parsedHit
+                    ? `${(data as any).parsedHit.displayText} (${(data as any).parsedHit.points}点)`
+                    : data.x !== undefined && data.y !== undefined
                     ? `X:${data.x}, Y:${data.y}`
-                    : data.rawData}
+                    : data.rawData || 'データなし'}
                 </span>
               </div>
             ))}

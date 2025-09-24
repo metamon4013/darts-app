@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useBluetoothContext } from '@/contexts/BluetoothContext';
 import DartBoard from '@/components/DartBoard';
 import ScoreDisplay from '@/components/ScoreDisplay';
+import PlayerSetup, { type Player } from '@/components/PlayerSetup';
+import GameScoreDisplay from '@/components/GameScoreDisplay';
+import { parseDartsioData, type DartHit } from '@/utils/dartsioParser';
 
 interface BluetoothData {
   deviceId: string;
@@ -21,9 +24,22 @@ declare global {
 }
 
 export default function Game501() {
+  // ゲーム状態管理
+  const [gameMode, setGameMode] = useState<'setup' | 'playing'>('setup');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const [gameCompleted, setGameCompleted] = useState(false);
+  const [winner, setWinner] = useState<Player | null>(null);
+  const [lastDartHit, setLastDartHit] = useState<DartHit | null>(null);
+
+  // シングルプレイヤー用
   const [score, setScore] = useState(501);
   const [gameHistory, setGameHistory] = useState<number[]>([]);
-  const [gameCompleted, setGameCompleted] = useState(false);
+  const [dartHistory, setDartHistory] = useState<DartHit[]>([]);
+  const [currentThrow, setCurrentThrow] = useState(1); // 現在の投数（1-3）
+  const [currentTurnScores, setCurrentTurnScores] = useState<number[]>([]); // 現在のターンの投数
+  const [turnHistory, setTurnHistory] = useState<number[][]>([]); // ターンごとの履歴
+
   const { isConnected } = useBluetoothContext();
 
   const calculatePointsFromCoordinates = (x: number, y: number): number => {
@@ -49,31 +65,223 @@ export default function Game501() {
     return sections[sectionIndex] || 0;
   };
 
-  const handleDartHit = (points: number) => {
+  const handleDartHit = (points: number, dartHit?: DartHit) => {
     if (gameCompleted) return;
 
-    const newScore = score - points;
+    // マルチプレイヤー処理
+    if (players.length > 1) {
+      const currentPlayer = players[currentPlayerIndex];
+      if (!currentPlayer || currentPlayer.isFinished) return;
 
-    // バーストチェック（0未満または1で終わる）
-    if (newScore < 0 || newScore === 1) {
-      console.log('バースト！');
-      return;
+      const newScore = currentPlayer.score - points;
+
+      // バーストチェック（0未満または1で終わる）
+      if (newScore < 0 || newScore === 1) {
+        console.log(`${currentPlayer.name} バースト！ターン終了`);
+
+        // バースト時は現在のターンを履歴に追加してリセット
+        const updatedPlayers = [...players];
+        updatedPlayers[currentPlayerIndex] = {
+          ...currentPlayer,
+          currentThrow: 1, // リセット
+          isActive: false,
+          currentTurnScores: [], // バースト時もリセット
+          turnHistory: [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores]]
+        };
+        setPlayers(updatedPlayers);
+
+        // 次のプレイヤーに交代
+        nextPlayer();
+        return;
+      }
+
+      // プレイヤー情報を更新
+      const updatedPlayers = [...players];
+      const updatedCurrentPlayer = {
+        ...currentPlayer,
+        score: newScore,
+        gameHistory: [...currentPlayer.gameHistory, points],
+        dartHistory: dartHit ? [...currentPlayer.dartHistory, dartHit] : currentPlayer.dartHistory,
+        isFinished: newScore === 0,
+        currentTurnScores: [...currentPlayer.currentTurnScores, points]
+      };
+
+      // ダーツヒット情報を更新
+      if (dartHit) {
+        setLastDartHit(dartHit);
+      }
+
+      // ゲーム完了チェック
+      if (newScore === 0) {
+        updatedCurrentPlayer.isFinished = true;
+        // ゲーム完了時も現在のターンを履歴に追加
+        updatedCurrentPlayer.turnHistory = [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores, points]];
+        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
+        setPlayers(updatedPlayers);
+        setWinner(updatedCurrentPlayer);
+        setGameCompleted(true);
+        console.log(`${currentPlayer.name} ゲーム完了！`);
+        return;
+      }
+
+      // 3投目まで続ける
+      if (currentPlayer.currentThrow < 3) {
+        // 次の投数に進む
+        updatedCurrentPlayer.currentThrow = currentPlayer.currentThrow + 1;
+        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
+        setPlayers(updatedPlayers);
+        console.log(`${currentPlayer.name} - ${updatedCurrentPlayer.currentThrow}投目`);
+      } else {
+        // 3投目完了 - 次のプレイヤーに交代
+        updatedCurrentPlayer.currentThrow = 1; // リセット
+        updatedCurrentPlayer.isActive = false;
+        updatedCurrentPlayer.turnHistory = [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores, points]]; // ターン履歴に追加
+        updatedCurrentPlayer.currentTurnScores = []; // ターン終了でリセット
+        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
+        setPlayers(updatedPlayers);
+
+        console.log(`${currentPlayer.name} のターン終了`);
+        nextPlayer();
+      }
+
+    } else {
+      // シングルプレイヤー処理
+      const newScore = score - points;
+
+      // バーストチェック（0未満または1で終わる）
+      if (newScore < 0 || newScore === 1) {
+        console.log('バースト！ターン終了');
+
+        // バースト時は現在のターンをリセットして次のターンへ
+        const newTurnHistory = [...turnHistory, [...currentTurnScores]];
+        setTurnHistory(newTurnHistory);
+        setCurrentTurnScores([]);
+        setCurrentThrow(1);
+        return;
+      }
+
+      // スコアと履歴を更新
+      const newCurrentTurnScores = [...currentTurnScores, points];
+      setScore(newScore);
+      setGameHistory([...gameHistory, points]);
+      setCurrentTurnScores(newCurrentTurnScores);
+
+      // ダーツヒット履歴を更新
+      if (dartHit) {
+        setDartHistory([...dartHistory, dartHit]);
+        setLastDartHit(dartHit);
+      }
+
+      // ゲーム完了チェック
+      if (newScore === 0) {
+        // ゲーム完了時は現在のターンも履歴に追加
+        const finalTurnHistory = [...turnHistory, newCurrentTurnScores];
+        setTurnHistory(finalTurnHistory);
+        setGameCompleted(true);
+        console.log('ゲーム完了！');
+        return;
+      }
+
+      // ターン管理（3投まで）
+      if (currentThrow < 3) {
+        // 次の投数に進む
+        setCurrentThrow(currentThrow + 1);
+        console.log(`${currentThrow + 1}投目`);
+      } else {
+        // 3投目完了 - 次のターンへ
+        const newTurnHistory = [...turnHistory, newCurrentTurnScores];
+        setTurnHistory(newTurnHistory);
+        setCurrentTurnScores([]);
+        setCurrentThrow(1);
+        console.log('ターン終了 - 次のターンへ');
+      }
     }
+  };
 
-    setScore(newScore);
-    setGameHistory([...gameHistory, points]);
+  const handleGameStart = (newPlayers: Player[]) => {
+    setPlayers(newPlayers);
+    setCurrentPlayerIndex(0);
+    setGameMode('playing');
+    setGameCompleted(false);
+    setWinner(null);
+    setLastDartHit(null);
 
-    // ゲーム完了チェック
-    if (newScore === 0) {
-      setGameCompleted(true);
-      console.log('ゲーム完了！');
+    // シングルプレイヤーの場合は既存のstateも更新
+    if (newPlayers.length === 1) {
+      setScore(501);
+      setGameHistory([]);
+      setDartHistory([]);
+      setCurrentThrow(1);
+      setCurrentTurnScores([]);
+      setTurnHistory([]);
     }
   };
 
   const resetGame = () => {
+    setGameMode('setup');
+    setPlayers([]);
+    setCurrentPlayerIndex(0);
+    setGameCompleted(false);
+    setWinner(null);
+    setLastDartHit(null);
+
+    // シングルプレイヤー用のstateもリセット
     setScore(501);
     setGameHistory([]);
-    setGameCompleted(false);
+    setDartHistory([]);
+    setCurrentThrow(1);
+    setCurrentTurnScores([]);
+    setTurnHistory([]);
+  };
+
+  const nextPlayer = () => {
+    if (gameCompleted) return;
+
+    const currentPlayer = players[currentPlayerIndex];
+    if (!currentPlayer) return;
+
+    // 現在のプレイヤーの投数を3に設定（ターン終了）
+    const updatedPlayersWithThrowReset = [...players];
+    updatedPlayersWithThrowReset[currentPlayerIndex] = {
+      ...currentPlayer,
+      currentThrow: 1, // 次のターンで1投目から
+      isActive: false,
+      turnHistory: currentPlayer.currentTurnScores.length > 0
+        ? [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores]]
+        : currentPlayer.turnHistory, // 現在のターンがあれば履歴に追加
+      currentTurnScores: [] // ターン終了でリセット
+    };
+
+    // 次のプレイヤーを探す
+    let nextIndex = (currentPlayerIndex + 1) % players.length;
+
+    // 完了していないプレイヤーを探す
+    const activePlayers = players.filter(p => !p.isFinished);
+    if (activePlayers.length <= 1) {
+      // ゲーム終了
+      const finishedPlayer = players.find(p => p.isFinished);
+      if (finishedPlayer) {
+        setWinner(finishedPlayer);
+        setGameCompleted(true);
+      }
+      return;
+    }
+
+    // 次のアクティブなプレイヤーを見つける
+    while (updatedPlayersWithThrowReset[nextIndex].isFinished && nextIndex !== currentPlayerIndex) {
+      nextIndex = (nextIndex + 1) % players.length;
+    }
+
+    // 次のプレイヤーをアクティブにして、1投目から開始
+    updatedPlayersWithThrowReset[nextIndex] = {
+      ...updatedPlayersWithThrowReset[nextIndex],
+      isActive: true,
+      currentThrow: 1,
+      currentTurnScores: [] // 新しいターンで空からスタート
+    };
+
+    setPlayers(updatedPlayersWithThrowReset);
+    setCurrentPlayerIndex(nextIndex);
   };
 
   // Bluetooth data listener
@@ -81,7 +289,20 @@ export default function Game501() {
     if (!isConnected) return;
 
     const handleBluetoothData = (event: any, data: BluetoothData) => {
-      if (data.x !== undefined && data.y !== undefined) {
+      console.log('Received Bluetooth data:', data);
+
+      // 新しいDartsio形式のデータ（rawData）を優先
+      if (data.rawData) {
+        const dartHit = parseDartsioData(data.rawData);
+        if (dartHit) {
+          console.log('Parsed dart hit:', dartHit);
+          handleDartHit(dartHit.points, dartHit);
+        } else {
+          console.warn('Failed to parse Dartsio data:', data.rawData);
+        }
+      }
+      // 座標データ（古い形式）もサポート
+      else if (data.x !== undefined && data.y !== undefined) {
         const points = calculatePointsFromCoordinates(data.x, data.y);
         handleDartHit(points);
       }
@@ -94,16 +315,40 @@ export default function Game501() {
         window.electronAPI.removeBluetoothDataListener(handleBluetoothData);
       };
     }
-  }, [isConnected, score, gameHistory, gameCompleted]);
+  }, [isConnected, score, gameHistory, dartHistory, gameCompleted]);
 
+  // ゲーム設定画面
+  if (gameMode === 'setup') {
+    return (
+      <div>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold mb-2">501ゲーム</h1>
+          <p className="text-gray-400">プレイヤー設定</p>
+        </div>
+
+        <PlayerSetup
+          onGameStart={handleGameStart}
+          onCancel={() => {/* ホームに戻る処理は必要に応じて */}}
+        />
+      </div>
+    );
+  }
+
+  // ゲームプレイ画面
   return (
     <div>
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold mb-2">501ゲーム</h1>
-        <p className="text-gray-400">501点からちょうど0点を目指しましょう</p>
+        <p className="text-gray-400">
+          {players.length > 1 ?
+            `${players.length}プレイヤー` :
+            '501点からちょうど0点を目指しましょう'
+          }
+        </p>
       </div>
 
-      {gameCompleted && (
+      {/* シングルプレイヤー完了表示 */}
+      {gameCompleted && players.length === 1 && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4 mb-6 text-center">
           <h2 className="text-2xl font-bold text-green-400 mb-2">🎉 ゲーム完了！</h2>
           <p className="text-green-300">
@@ -118,40 +363,92 @@ export default function Game501() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <ScoreDisplay
-            currentScore={score}
-            gameHistory={gameHistory}
-            onReset={resetGame}
-          />
+      {/* 最新のダーツヒット表示 */}
+      {lastDartHit && !gameCompleted && (
+        <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mb-6 text-center">
+          <h3 className="text-lg font-bold text-blue-400 mb-2">
+            {players.length > 1 ?
+              `${players[currentPlayerIndex]?.name} の最新ダーツ` :
+              '最新のダーツ'
+            }
+          </h3>
+          <p className="text-blue-300 text-xl font-mono">
+            {lastDartHit.displayText} - {lastDartHit.points}点
+          </p>
+          {players.length === 1 && (
+            <p className="text-blue-400 text-sm mt-1">
+              {currentThrow}/3投目
+            </p>
+          )}
+        </div>
+      )}
 
+      <div className="space-y-6">
+        {/* プレイヤー情報（中央に横並び） */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-6xl">
+            <GameScoreDisplay
+              singlePlayerName="プレイヤー1"
+              singlePlayerScore={score}
+              singlePlayerGameHistory={gameHistory}
+              singlePlayerCurrentThrow={currentThrow}
+              singlePlayerCurrentTurnScores={currentTurnScores}
+              singlePlayerTurnHistory={turnHistory}
+              players={players}
+              currentPlayerIndex={currentPlayerIndex}
+              gameCompleted={gameCompleted}
+              winner={winner || undefined}
+              onReset={resetGame}
+            />
+          </div>
+        </div>
+
+        {/* 手動入力（下部中央） */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-4xl">
+            <DartBoard
+              onDartHit={handleDartHit}
+              disabled={gameCompleted}
+            />
+
+            {/* ターン制御ボタン */}
+            {players.length > 1 && !gameCompleted && (
+              <div className="mt-4 text-center space-y-2">
+                <button
+                  onClick={nextPlayer}
+                  className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold"
+                >
+                  ターンスキップ →
+                </button>
+                <div className="text-xs text-gray-400">
+                  現在: {players[currentPlayerIndex]?.name} ({players[currentPlayerIndex]?.currentThrow}/3投目)
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* サイド情報（最下部） */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {!isConnected && (
-            <div className="mt-4 p-4 bg-blue-900 border border-blue-700 rounded-lg">
+            <div className="p-4 bg-blue-900 border border-blue-700 rounded-lg">
               <h3 className="font-bold mb-2">💡 ヒント</h3>
               <p className="text-sm text-blue-300">
                 Dartsioデバイスを接続すると自動でスコアが計算されます。
-                手動でプレイする場合は、下のダーツボードをクリックしてください。
+                手動でプレイする場合は、上のダーツボードをクリックしてください。
               </p>
             </div>
           )}
 
-          <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+          <div className="p-4 bg-gray-800 rounded-lg">
             <h3 className="font-bold mb-2">ルール</h3>
             <ul className="text-sm text-gray-300 space-y-1">
               <li>• 501点からスタート</li>
               <li>• ちょうど0点でフィニッシュ</li>
               <li>• 0未満または1点でバースト</li>
-              <li>• ダブルでフィニッシュ推奨</li>
+              <li>• マルチプレイヤー時は順番制</li>
             </ul>
           </div>
-        </div>
-
-        <div className="lg:col-span-2">
-          <DartBoard
-            onDartHit={handleDartHit}
-            disabled={gameCompleted}
-          />
         </div>
       </div>
     </div>
