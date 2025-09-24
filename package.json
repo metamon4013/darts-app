@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "autoprefixer": "^10.4.0",
-    "electron": "^27.0.0",
     "next": "^14.0.0",
     "postcss": "^8.4.0",
     "react": "^18.0.0",
@@ -29,10 +28,11 @@
     "@types/react-dom": "^18.0.0",
     "concurrently": "^8.0.0",
     "cross-env": "^10.0.0",
+    "electron": "^27.0.0",
     "electron-builder": "^24.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.9.2",
     "wait-on": "^7.0.0"
   },
   "build": {
@@ -44,7 +44,10 @@
     "files": [
       "out/**/*",
       "electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
     ]
   }
 }
