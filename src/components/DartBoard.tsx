@@ -35,7 +35,7 @@ export default function DartBoard({ onDartHit, disabled = false }: DartBoardProp
   return (
     <div className={`bg-gray-800 p-6 rounded-lg ${disabled ? 'opacity-50' : ''}`}>
       <h2 className="text-xl font-bold mb-4 text-center">
-        ダーツボード (手動入力) {disabled && '- 無効'}
+        スコア入力{disabled && '- 無効'}
       </h2>
 
       <div className="space-y-6">

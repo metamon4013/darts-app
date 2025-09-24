@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useBluetoothContext } from '@/contexts/BluetoothContext';
-import DartsioDataDisplay from '@/components/DartsioDataDisplay';
+import DartsioDataDisplay from '@/components/layout/DartsioDataDisplay';
 
 interface LayoutProps {
   children: ReactNode;

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBluetoothContext } from '@/contexts/BluetoothContext';
 import DartBoard from '@/components/DartBoard';
-import ScoreDisplay from '@/components/ScoreDisplay';
 import PlayerSetup, { type Player } from '@/components/PlayerSetup';
 import GameScoreDisplay from '@/components/GameScoreDisplay';
 import { parseDartsioData, type DartHit } from '@/utils/dartsioParser';
@@ -321,11 +320,6 @@ export default function Game501() {
   if (gameMode === 'setup') {
     return (
       <div>
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold mb-2">501ゲーム</h1>
-          <p className="text-gray-400">プレイヤー設定</p>
-        </div>
-
         <PlayerSetup
           onGameStart={handleGameStart}
           onCancel={() => {/* ホームに戻る処理は必要に応じて */}}
@@ -337,16 +331,6 @@ export default function Game501() {
   // ゲームプレイ画面
   return (
     <div>
-      <div className="text-center mb-6">
-        <h1 className="text-3xl font-bold mb-2">501ゲーム</h1>
-        <p className="text-gray-400">
-          {players.length > 1 ?
-            `${players.length}プレイヤー` :
-            '501点からちょうど0点を目指しましょう'
-          }
-        </p>
-      </div>
-
       {/* シングルプレイヤー完了表示 */}
       {gameCompleted && players.length === 1 && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-4 mb-6 text-center">
@@ -404,51 +388,11 @@ export default function Game501() {
         </div>
 
         {/* 手動入力（下部中央） */}
-        <div className="flex justify-center">
-          <div className="w-full max-w-4xl">
+        <div className="flex justify-center w-full">
             <DartBoard
               onDartHit={handleDartHit}
               disabled={gameCompleted}
             />
-
-            {/* ターン制御ボタン */}
-            {players.length > 1 && !gameCompleted && (
-              <div className="mt-4 text-center space-y-2">
-                <button
-                  onClick={nextPlayer}
-                  className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold"
-                >
-                  ターンスキップ →
-                </button>
-                <div className="text-xs text-gray-400">
-                  現在: {players[currentPlayerIndex]?.name} ({players[currentPlayerIndex]?.currentThrow}/3投目)
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* サイド情報（最下部） */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {!isConnected && (
-            <div className="p-4 bg-blue-900 border border-blue-700 rounded-lg">
-              <h3 className="font-bold mb-2">💡 ヒント</h3>
-              <p className="text-sm text-blue-300">
-                Dartsioデバイスを接続すると自動でスコアが計算されます。
-                手動でプレイする場合は、上のダーツボードをクリックしてください。
-              </p>
-            </div>
-          )}
-
-          <div className="p-4 bg-gray-800 rounded-lg">
-            <h3 className="font-bold mb-2">ルール</h3>
-            <ul className="text-sm text-gray-300 space-y-1">
-              <li>• 501点からスタート</li>
-              <li>• ちょうど0点でフィニッシュ</li>
-              <li>• 0未満または1点でバースト</li>
-              <li>• マルチプレイヤー時は順番制</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>

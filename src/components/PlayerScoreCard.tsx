@@ -83,7 +83,6 @@ export default function PlayerScoreCard({
 
         {/* 現在のスコア */}
         <div className="text-center">
-          <div className="text-sm text-gray-400 mb-2">現在のスコア</div>
           <div className={`text-4xl font-bold ${getScoreColor()}`}>
             {isGameBust ? 'BUST' : currentScore}
           </div>

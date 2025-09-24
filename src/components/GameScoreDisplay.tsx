@@ -78,19 +78,6 @@ export default function GameScoreDisplay({
             />
           ))}
         </div>
-
-        {/* ゲーム情報 */}
-        <div className="mt-6 pt-4 border-t border-gray-600">
-          <div className="flex justify-center space-x-6 text-sm text-gray-400">
-            <div>プレイヤー数: <span className="text-white">{players.length}</span></div>
-            <div>完了者: <span className="text-white">{players.filter(p => p.isFinished).length}</span></div>
-            {!gameCompleted && (
-              <div>
-                現在のターン: <span className="text-blue-400 font-bold">{players[currentPlayerIndex]?.name}</span>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     );
   }
