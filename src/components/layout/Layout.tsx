@@ -51,6 +51,12 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   301ゲーム
                 </Link>
+                <Link
+                  href="/game/countup"
+                  className={`px-3 py-2 rounded ${router.pathname === '/game/countup' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}
+                >
+                  カウントアップ
+                </Link>
               </nav>
             </div>
 

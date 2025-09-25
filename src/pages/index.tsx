@@ -67,7 +67,7 @@ export default function Home() {
         <GameCard
           title="カウントアップ"
           description="制限投数内でできるだけ高得点を目指すゲーム。"
-          href="/game/count-up"
+          href="/game/countup"
           icon="📈"
         />
 

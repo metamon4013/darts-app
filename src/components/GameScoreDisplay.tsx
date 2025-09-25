@@ -57,16 +57,30 @@ export default function GameScoreDisplay({
       const currentTurnScore = (playerIndex === currentPlayerIndex && currentTurnData.length > 0)
         ? currentTurnData.reduce((sum, score) => sum + score, 0)
         : 0;
+
+      // カウントアップモード（initialScore === 0）の場合は加算
+      if (initialScore === 0) {
+        return totalScored + currentTurnScore;
+      }
+      // 501/301モードの場合は減算
       return initialScore - totalScored - currentTurnScore;
     }
     // 後方互換性: マルチプレイヤーの場合はplayers配列から取得
     if (players[playerIndex]) {
       return players[playerIndex].score;
     }
-    // シングルプレイヤーの場合（現在のターンスコアも含める）
-    const baseScore = singlePlayerScore || initialScore;
-    const currentScore = currentTurnData.length > 0 ? currentTurnData.reduce((sum, score) => sum + score, 0) : 0;
-    return baseScore - currentScore;
+    // シングルプレイヤーの場合
+    if (initialScore === 0) {
+      // カウントアップモード
+      const baseScore = singlePlayerScore || 0;
+      const currentScore = currentTurnData.length > 0 ? currentTurnData.reduce((sum, score) => sum + score, 0) : 0;
+      return baseScore + currentScore;
+    } else {
+      // 501/301モード
+      const baseScore = singlePlayerScore || initialScore;
+      const currentScore = currentTurnData.length > 0 ? currentTurnData.reduce((sum, score) => sum + score, 0) : 0;
+      return baseScore - currentScore;
+    }
   };
 
   // プレイヤーのゲーム履歴を取得する関数

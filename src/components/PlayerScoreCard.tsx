@@ -223,12 +223,6 @@ export default function PlayerScoreCard({
           </div>
         </div>
 
-        {/* フィニッシュ圏内表示 */}
-        {currentScore <= 170 && currentScore > 0 && !isFinished && (
-          <div className="text-center text-xs text-yellow-300">
-            🎯 フィニッシュ圏内
-          </div>
-        )}
 
       </div>
 
