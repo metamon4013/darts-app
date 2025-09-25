@@ -10,8 +10,6 @@ interface PlayerScoreCardProps {
   isActive?: boolean;
   isFinished?: boolean;
   isGameCompleted?: boolean;
-  onReset?: () => void;
-  showResetButton?: boolean;
   allowNameEdit?: boolean;
 }
 
@@ -25,8 +23,6 @@ export default function PlayerScoreCard({
   isActive = false,
   isFinished = false,
   isGameCompleted = false,
-  onReset,
-  showResetButton = false,
   allowNameEdit = true,
 }: PlayerScoreCardProps) {
   const [playerName, setPlayerName] = useState(initialPlayerName);
@@ -195,15 +191,6 @@ export default function PlayerScoreCard({
           </div>
         )}
 
-        {/* リセットボタン */}
-        {showResetButton && onReset && (
-          <button
-            onClick={onReset}
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded w-full text-sm"
-          >
-            ゲームリセット
-          </button>
-        )}
       </div>
     </div>
   );

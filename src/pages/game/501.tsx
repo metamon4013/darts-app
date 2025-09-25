@@ -177,6 +177,21 @@ export default function Game501() {
         const finalTurnHistory = [...turnHistory, newCurrentTurnScores];
         setTurnHistory(finalTurnHistory);
         setGameCompleted(true);
+
+        // シングルプレイヤー用のwinner設定
+        const singlePlayerWinner = {
+          id: 'single-player',
+          name: 'プレイヤー1',
+          score: 0,
+          gameHistory: [...gameHistory, points],
+          isFinished: true,
+          isActive: false,
+          currentThrow: 1,
+          currentTurnScores: [],
+          turnHistory: finalTurnHistory
+        };
+        setWinner(singlePlayerWinner);
+
         console.log('ゲーム完了！');
         return;
       }
@@ -331,21 +346,6 @@ export default function Game501() {
   // ゲームプレイ画面
   return (
     <div>
-      {/* シングルプレイヤー完了表示 */}
-      {gameCompleted && players.length === 1 && (
-        <div className="bg-green-900 border border-green-700 rounded-lg p-4 mb-6 text-center">
-          <h2 className="text-2xl font-bold text-green-400 mb-2">🎉 ゲーム完了！</h2>
-          <p className="text-green-300">
-            {gameHistory.length} 投でフィニッシュしました！
-          </p>
-          <button
-            onClick={resetGame}
-            className="mt-3 bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
-          >
-            新しいゲーム
-          </button>
-        </div>
-      )}
 
       {/* 最新のダーツヒット表示 */}
       {lastDartHit && !gameCompleted && (
@@ -359,11 +359,12 @@ export default function Game501() {
           <p className="text-blue-300 text-xl font-mono">
             {lastDartHit.displayText} - {lastDartHit.points}点
           </p>
-          {players.length === 1 && (
-            <p className="text-blue-400 text-sm mt-1">
-              {currentThrow}/3投目
-            </p>
-          )}
+          <p className="text-blue-400 text-sm mt-1">
+            {players.length > 1 ?
+              `${players[currentPlayerIndex]?.currentThrow || 1}/3投目` :
+              `${currentThrow}/3投目`
+            }
+          </p>
         </div>
       )}
 
