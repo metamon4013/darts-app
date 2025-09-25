@@ -31,7 +31,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header with Bluetooth Connection */}
-      <header className="bg-gray-800 border-b border-gray-700">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-gray-800 border-b border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center space-x-6">
@@ -91,7 +91,7 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto mt-8 px-4 py-6 pt-32">
         {children}
       </div>
     </div>

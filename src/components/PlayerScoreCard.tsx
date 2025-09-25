@@ -11,6 +11,8 @@ interface PlayerScoreCardProps {
   isFinished?: boolean;
   isGameCompleted?: boolean;
   allowNameEdit?: boolean;
+  onStartEditHistoryData?: (playerIndex: number, turnIndex: number, throwIndex: number) => void;
+  playerIndex?: number;
 }
 
 export default function PlayerScoreCard({
@@ -24,6 +26,8 @@ export default function PlayerScoreCard({
   isFinished = false,
   isGameCompleted = false,
   allowNameEdit = true,
+  onStartEditHistoryData,
+  playerIndex = 0,
 }: PlayerScoreCardProps) {
   const [playerName, setPlayerName] = useState(initialPlayerName);
 
@@ -149,7 +153,20 @@ export default function PlayerScoreCard({
                     </div>
                     <div className="flex space-x-1">
                       {turn.map((score, throwIndex) => (
-                        <div key={throwIndex} className="bg-gray-600 px-1 py-0.5 rounded text-xs">
+                        <div
+                          key={throwIndex}
+                          className={`px-1 py-0.5 rounded text-xs transition-colors ${
+                            onStartEditHistoryData && !isGameCompleted
+                              ? 'bg-gray-600 hover:bg-gray-500 cursor-pointer'
+                              : 'bg-gray-600'
+                          }`}
+                          onClick={() => {
+                            if (onStartEditHistoryData && !isGameCompleted) {
+                              const actualTurnIndex = turnHistory.length - index - 1;
+                              onStartEditHistoryData(playerIndex, actualTurnIndex, throwIndex);
+                            }
+                          }}
+                        >
                           {score}
                         </div>
                       ))}
@@ -198,6 +215,7 @@ export default function PlayerScoreCard({
         )}
 
       </div>
+
     </div>
   );
 }

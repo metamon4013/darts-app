@@ -33,14 +33,6 @@ export default function Home() {
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-4">Dart Scorer</h1>
         <p className="text-gray-400 text-lg">ゲームを選択してください</p>
-
-        {!isConnected && (
-          <div className="mt-4 p-4 bg-yellow-900 border border-yellow-700 rounded-lg inline-block">
-            <p className="text-yellow-300">
-              💡 上部のヘッダーからDartsioに接続できます
-            </p>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

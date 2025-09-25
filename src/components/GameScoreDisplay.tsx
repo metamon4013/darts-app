@@ -27,6 +27,7 @@ interface GameScoreDisplayProps {
   gameCompleted: boolean;
   winner?: Player;
   onReset: () => void;
+  onStartEditHistoryData?: (playerIndex: number, turnIndex: number, throwIndex: number) => void;
 }
 
 export default function GameScoreDisplay({
@@ -42,7 +43,8 @@ export default function GameScoreDisplay({
   currentTurnData = [],
   gameCompleted,
   winner,
-  onReset
+  onReset,
+  onStartEditHistoryData
 }: GameScoreDisplayProps) {
 
   // プレイヤーのスコアを計算する関数
@@ -161,6 +163,8 @@ export default function GameScoreDisplay({
             isFinished={player.isFinished}
             isGameCompleted={gameCompleted}
             allowNameEdit={!isMultiPlayer}
+            onStartEditHistoryData={onStartEditHistoryData}
+            playerIndex={isMultiPlayer ? index : 0}
           />
         ))}
       </div>

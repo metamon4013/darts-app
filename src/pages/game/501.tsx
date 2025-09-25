@@ -44,6 +44,14 @@ export default function Game501() {
   // シングルプレイヤー用の統計データ（後方互換性のため）
   const [dartHistory, setDartHistory] = useState<DartHit[]>([]);
 
+  // 履歴データ修正用のstate
+  const [editingHistoryData, setEditingHistoryData] = useState<{
+    playerIndex: number;
+    turnIndex: number;
+    throwIndex: number;
+    currentScore: number;
+  } | null>(null);
+
   // 現在のプレイヤースコアを計算する関数
   const getCurrentPlayerScore = (playerIndex: number): number => {
     if (!gamePlayData[playerIndex]) return 501;
@@ -60,6 +68,80 @@ export default function Game501() {
   };
 
   const { isConnected } = useBluetoothContext();
+
+  // 履歴データ修正開始
+  const startEditHistoryData = (playerIndex: number, turnIndex: number, throwIndex: number) => {
+    if (gameCompleted) return;
+
+    // 現在の得点を取得
+    const currentScore = gamePlayData[playerIndex]?.[turnIndex]?.[throwIndex] || 0;
+
+    setEditingHistoryData({
+      playerIndex,
+      turnIndex,
+      throwIndex,
+      currentScore
+    });
+  };
+
+  // 履歴データ修正処理
+  const updateHistoryData = (newScore: number) => {
+    if (!editingHistoryData) return;
+
+    const { playerIndex, turnIndex, throwIndex } = editingHistoryData;
+
+    // gamePlayDataを更新
+    const newGamePlayData = [...gamePlayData];
+    if (!newGamePlayData[playerIndex]) {
+      newGamePlayData[playerIndex] = [];
+    }
+    if (!newGamePlayData[playerIndex][turnIndex]) {
+      newGamePlayData[playerIndex][turnIndex] = [];
+    }
+
+    newGamePlayData[playerIndex][turnIndex][throwIndex] = newScore;
+    setGamePlayData(newGamePlayData);
+
+    // 編集モードを終了
+    setEditingHistoryData(null);
+
+    console.log(`プレイヤー${playerIndex + 1}のターン${turnIndex + 1}の投数${throwIndex + 1}を${editingHistoryData.currentScore}から${newScore}に修正`);
+  };
+
+  // 履歴データ修正キャンセル
+  const cancelEditHistoryData = () => {
+    setEditingHistoryData(null);
+  };
+
+  // ターン終了処理（3投完了後のみ）
+  const finishCurrentTurn = () => {
+    if (gameCompleted || currentTurnData.length === 0) return;
+
+    // 3投完了している場合のみターン終了を許可
+    if (currentThrow !== 3 || currentTurnData.length < 3) return;
+
+    const isMultiPlayer = players.length > 1;
+    const playerIndex = isMultiPlayer ? currentPlayerIndex : 0;
+
+    // 現在のターンデータをプレイデータに追加
+    const newGamePlayData = [...gamePlayData];
+    if (!newGamePlayData[playerIndex]) {
+      newGamePlayData[playerIndex] = [];
+    }
+    newGamePlayData[playerIndex].push([...currentTurnData]);
+    setGamePlayData(newGamePlayData);
+
+    // ターンをリセット
+    setCurrentTurnData([]);
+    setCurrentThrow(1);
+
+    if (isMultiPlayer) {
+      console.log(`${players[currentPlayerIndex]?.name} のターン終了（エンターキー）`);
+      nextPlayer();
+    } else {
+      console.log('ターン終了（エンターキー） - 次のターンへ');
+    }
+  };
 
   const calculatePointsFromCoordinates = (x: number, y: number): number => {
     const centerX = 0;
@@ -86,6 +168,12 @@ export default function Game501() {
 
   const handleDartHit = (points: number, dartHit?: DartHit) => {
     if (gameCompleted) return;
+
+    // 4投目以降は無視
+    if (currentTurnData.length >= 3) {
+      console.log('4投目以降は無視されます - Enterキーでターン終了してください');
+      return;
+    }
 
     const isMultiPlayer = players.length > 1;
     const playerIndex = isMultiPlayer ? currentPlayerIndex : 0;
@@ -164,23 +252,10 @@ export default function Game501() {
       // 次の投数に進む
       setCurrentThrow(currentThrow + 1);
       console.log(`${isMultiPlayer ? players[currentPlayerIndex]?.name : 'プレイヤー1'} - ${currentThrow + 1}投目`);
-    } else {
-      // 3投目完了 - ターンを完了してプレイデータに追加
-      const newGamePlayData = [...gamePlayData];
-      if (!newGamePlayData[playerIndex]) {
-        newGamePlayData[playerIndex] = [];
-      }
-      newGamePlayData[playerIndex].push(newCurrentTurnData);
-      setGamePlayData(newGamePlayData);
-      setCurrentTurnData([]);
-      setCurrentThrow(1);
-
-      if (isMultiPlayer) {
-        console.log(`${players[currentPlayerIndex]?.name} のターン終了`);
-        nextPlayer();
-      } else {
-        console.log('ターン終了 - 次のターンへ');
-      }
+    }
+    // 3投目の場合はcurrentThrowを変更せず、エンターキーでのターン終了を待機
+    if (currentThrow === 3) {
+      console.log(`${isMultiPlayer ? players[currentPlayerIndex]?.name : 'プレイヤー1'} - 3投目完了、Enterキーでターン終了`);
     }
   };
 
@@ -278,6 +353,25 @@ export default function Game501() {
     }
   }, [isConnected, gamePlayData, currentTurnData, dartHistory, gameCompleted]);
 
+  // キーボードイベントリスナー
+  useEffect(() => {
+    if (gameMode !== 'playing') return;
+
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // エンターキーでターン終了
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finishCurrentTurn();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [gameMode, gameCompleted, currentTurnData, currentPlayerIndex, players, gamePlayData]);
+
   // ゲーム設定画面
   if (gameMode === 'setup') {
     return (
@@ -315,6 +409,16 @@ export default function Game501() {
         </div>
       )}
 
+      {/* エンターキーヒント表示（3投完了後のみ） */}
+      {!gameCompleted && currentThrow === 3 && currentTurnData.length === 3 && (
+        <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 mb-4 text-center">
+          <p className="text-gray-400 text-sm">
+            <kbd className="bg-gray-700 px-2 py-1 rounded text-xs">Enter</kbd> キーでターン終了
+            {players.length > 1 && ` (${players[currentPlayerIndex]?.name})`}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* プレイヤー情報（中央に横並び） */}
         <div className="flex justify-center">
@@ -333,6 +437,7 @@ export default function Game501() {
               onReset={resetGame}
               gamePlayData={gamePlayData}
               currentTurnData={currentTurnData}
+              onStartEditHistoryData={startEditHistoryData}
             />
           </div>
         </div>
@@ -340,10 +445,32 @@ export default function Game501() {
         {/* 手動入力（下部中央） */}
         <div className="flex justify-center w-full">
             <DartBoard
-              onDartHit={handleDartHit}
+              onDartHit={editingHistoryData ? updateHistoryData : handleDartHit}
               disabled={gameCompleted}
             />
         </div>
+
+        {/* 履歴データ編集時のヒント */}
+        {editingHistoryData && (
+          <div className="bg-orange-900 border border-orange-700 rounded-lg p-4 text-center">
+            <h3 className="text-lg font-bold text-orange-400 mb-2">得点修正モード</h3>
+            <p className="text-orange-300 mb-2">
+              プレイヤー{editingHistoryData.playerIndex + 1} - ターン{editingHistoryData.turnIndex + 1} - 投数{editingHistoryData.throwIndex + 1}
+            </p>
+            <p className="text-orange-300 text-sm mb-3">
+              現在の得点: {editingHistoryData.currentScore}点
+            </p>
+            <p className="text-orange-200 text-sm mb-3">
+              下のスコア入力で新しい得点を入力してください
+            </p>
+            <button
+              onClick={cancelEditHistoryData}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm"
+            >
+              修正をキャンセル
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
