@@ -49,14 +49,20 @@ export default function GameScoreDisplay({
   const calculatePlayerScore = (playerIndex: number): number => {
     if (gamePlayData[playerIndex]) {
       const totalScored = gamePlayData[playerIndex].flat().reduce((sum, score) => sum + score, 0);
-      return 501 - totalScored;
+      // 現在投げている途中のスコアも含める
+      const currentTurnScore = (playerIndex === currentPlayerIndex && currentTurnData.length > 0)
+        ? currentTurnData.reduce((sum, score) => sum + score, 0)
+        : 0;
+      return 501 - totalScored - currentTurnScore;
     }
     // 後方互換性: マルチプレイヤーの場合はplayers配列から取得
     if (players[playerIndex]) {
       return players[playerIndex].score;
     }
-    // シングルプレイヤーの場合
-    return singlePlayerScore || 501;
+    // シングルプレイヤーの場合（現在のターンスコアも含める）
+    const baseScore = singlePlayerScore || 501;
+    const currentScore = currentTurnData.length > 0 ? currentTurnData.reduce((sum, score) => sum + score, 0) : 0;
+    return baseScore - currentScore;
   };
 
   // プレイヤーのゲーム履歴を取得する関数

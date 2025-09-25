@@ -37,8 +37,14 @@ export default function PlayerScoreCard({
     return 'text-white';
   };
 
-  const totalThrows = gameHistory.length;
-  const averagePerThrow = totalThrows > 0 ? (501 - currentScore) / totalThrows : 0;
+  const completedTurns = turnHistory.length;
+  const currentTurnInProgress = currentTurnScores.length > 0 ? 1 : 0;
+  const totalTurns = completedTurns + currentTurnInProgress;
+
+  // ターンごとの平均得点を計算
+  const averagePerTurn = completedTurns > 0
+    ? turnHistory.reduce((sum, turn) => sum + turn.reduce((turnSum, score) => turnSum + score, 0), 0) / completedTurns
+    : 0;
 
   const getCardBorderStyle = () => {
     if (isFinished) return 'border-green-500 bg-green-900/30';
@@ -92,12 +98,12 @@ export default function PlayerScoreCard({
         {/* 統計情報 */}
         <div className="grid grid-cols-2 gap-2 text-center text-sm">
           <div className="bg-gray-700 p-2 rounded">
-            <div className="text-xs text-gray-400">投げた回数</div>
-            <div className="font-bold">{totalThrows}</div>
+            <div className="text-xs text-gray-400">ターン数</div>
+            <div className="font-bold">{totalTurns}</div>
           </div>
           <div className="bg-gray-700 p-2 rounded">
-            <div className="text-xs text-gray-400">平均</div>
-            <div className="font-bold">{averagePerThrow.toFixed(1)}</div>
+            <div className="text-xs text-gray-400">ターン平均</div>
+            <div className="font-bold">{completedTurns > 0 ? averagePerTurn.toFixed(1) : '-'}</div>
           </div>
         </div>
 
