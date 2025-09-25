@@ -28,6 +28,7 @@ interface GameScoreDisplayProps {
   winner?: Player;
   onReset: () => void;
   onStartEditHistoryData?: (playerIndex: number, turnIndex: number, throwIndex: number) => void;
+  initialScore?: number;
 }
 
 export default function GameScoreDisplay({
@@ -44,7 +45,8 @@ export default function GameScoreDisplay({
   gameCompleted,
   winner,
   onReset,
-  onStartEditHistoryData
+  onStartEditHistoryData,
+  initialScore = 501
 }: GameScoreDisplayProps) {
 
   // プレイヤーのスコアを計算する関数
@@ -55,14 +57,14 @@ export default function GameScoreDisplay({
       const currentTurnScore = (playerIndex === currentPlayerIndex && currentTurnData.length > 0)
         ? currentTurnData.reduce((sum, score) => sum + score, 0)
         : 0;
-      return 501 - totalScored - currentTurnScore;
+      return initialScore - totalScored - currentTurnScore;
     }
     // 後方互換性: マルチプレイヤーの場合はplayers配列から取得
     if (players[playerIndex]) {
       return players[playerIndex].score;
     }
     // シングルプレイヤーの場合（現在のターンスコアも含める）
-    const baseScore = singlePlayerScore || 501;
+    const baseScore = singlePlayerScore || initialScore;
     const currentScore = currentTurnData.length > 0 ? currentTurnData.reduce((sum, score) => sum + score, 0) : 0;
     return baseScore - currentScore;
   };
@@ -165,6 +167,7 @@ export default function GameScoreDisplay({
             allowNameEdit={!isMultiPlayer}
             onStartEditHistoryData={onStartEditHistoryData}
             playerIndex={isMultiPlayer ? index : 0}
+            initialScore={initialScore}
           />
         ))}
       </div>

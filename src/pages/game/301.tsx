@@ -27,7 +27,7 @@ declare global {
   }
 }
 
-export default function Game501() {
+export default function Game301() {
   // ゲーム状態管理
   const [gameMode, setGameMode] = useState<'setup' | 'playing'>('setup');
   const [players, setPlayers] = useState<Player[]>([]);
@@ -54,11 +54,11 @@ export default function Game501() {
 
   // 現在のプレイヤースコアを計算する関数
   const getCurrentPlayerScore = (playerIndex: number): number => {
-    if (!gamePlayData[playerIndex]) return 501;
+    if (!gamePlayData[playerIndex]) return 301;
     const totalScored = gamePlayData[playerIndex]
       .flat()
       .reduce((sum, score) => sum + score, 0);
-    return 501 - totalScored;
+    return 301 - totalScored;
   };
 
   // ゲーム履歴を取得する関数（後方互換性のため）
@@ -73,20 +73,16 @@ export default function Game501() {
   const startEditHistoryData = (playerIndex: number, turnIndex: number, throwIndex: number) => {
     if (gameCompleted) return;
 
-    // 現在のターンの場合（turnIndex === -1）
-    if (turnIndex === -1) {
-      const currentScore = currentTurnData[throwIndex] || 0;
-      setEditingHistoryData({
-        playerIndex,
-        turnIndex,
-        throwIndex,
-        currentScore
-      });
-      return;
-    }
+    let currentScore = 0;
 
-    // 過去のターンの場合
-    const currentScore = gamePlayData[playerIndex]?.[turnIndex]?.[throwIndex] || 0;
+    // 現在のターンの修正（turnIndex === -1）
+    if (turnIndex === -1) {
+      // 現在のターンの得点を取得
+      currentScore = currentTurnData[throwIndex] || 0;
+    } else {
+      // 過去のターンの修正
+      currentScore = gamePlayData[playerIndex]?.[turnIndex]?.[throwIndex] || 0;
+    }
 
     setEditingHistoryData({
       playerIndex,
@@ -102,15 +98,15 @@ export default function Game501() {
 
     const { playerIndex, turnIndex, throwIndex } = editingHistoryData;
 
-    // 現在のターンの修正の場合（turnIndex === -1）
+    // 現在のターンの修正（turnIndex === -1）
     if (turnIndex === -1) {
+      // currentTurnDataを更新
       const newCurrentTurnData = [...currentTurnData];
       newCurrentTurnData[throwIndex] = newScore;
       setCurrentTurnData(newCurrentTurnData);
-
-      console.log(`現在のターンの投数${throwIndex + 1}を${editingHistoryData.currentScore}から${newScore}に修正`);
+      console.log(`プレイヤー${playerIndex + 1}の現在のターンの投数${throwIndex + 1}を${editingHistoryData.currentScore}から${newScore}に修正`);
     } else {
-      // 過去のターンの修正の場合
+      // 過去のターンの修正
       const newGamePlayData = [...gamePlayData];
       if (!newGamePlayData[playerIndex]) {
         newGamePlayData[playerIndex] = [];
@@ -121,7 +117,6 @@ export default function Game501() {
 
       newGamePlayData[playerIndex][turnIndex][throwIndex] = newScore;
       setGamePlayData(newGamePlayData);
-
       console.log(`プレイヤー${playerIndex + 1}のターン${turnIndex + 1}の投数${throwIndex + 1}を${editingHistoryData.currentScore}から${newScore}に修正`);
     }
 
@@ -408,7 +403,6 @@ export default function Game501() {
   // ゲームプレイ画面
   return (
     <div>
-
       {/* 最新のダーツヒット表示 */}
       {lastDartHit && !gameCompleted && (
         <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mb-6 text-center">
@@ -459,7 +453,7 @@ export default function Game501() {
               gamePlayData={gamePlayData}
               currentTurnData={currentTurnData}
               onStartEditHistoryData={startEditHistoryData}
-              initialScore={501}
+              initialScore={301}
             />
           </div>
         </div>
@@ -477,7 +471,9 @@ export default function Game501() {
           <div className="bg-orange-900 border border-orange-700 rounded-lg p-4 text-center">
             <h3 className="text-lg font-bold text-orange-400 mb-2">得点修正モード</h3>
             <p className="text-orange-300 mb-2">
-              プレイヤー{editingHistoryData.playerIndex + 1} - {editingHistoryData.turnIndex === -1 ? '現在のターン' : `ターン${editingHistoryData.turnIndex + 1}`} - 投数{editingHistoryData.throwIndex + 1}
+              プレイヤー{editingHistoryData.playerIndex + 1} -
+              {editingHistoryData.turnIndex === -1 ? '現在のターン' : `ターン${editingHistoryData.turnIndex + 1}`} -
+              投数{editingHistoryData.throwIndex + 1}
             </p>
             <p className="text-orange-300 text-sm mb-3">
               現在の得点: {editingHistoryData.currentScore}点

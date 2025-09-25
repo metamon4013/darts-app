@@ -13,6 +13,7 @@ interface PlayerScoreCardProps {
   allowNameEdit?: boolean;
   onStartEditHistoryData?: (playerIndex: number, turnIndex: number, throwIndex: number) => void;
   playerIndex?: number;
+  initialScore?: number;
 }
 
 export default function PlayerScoreCard({
@@ -28,6 +29,7 @@ export default function PlayerScoreCard({
   allowNameEdit = true,
   onStartEditHistoryData,
   playerIndex = 0,
+  initialScore = 501,
 }: PlayerScoreCardProps) {
   const [playerName, setPlayerName] = useState(initialPlayerName);
 
@@ -112,9 +114,9 @@ export default function PlayerScoreCard({
         </div>
 
         {/* 現在のターン情報 */}
-        {isActive && currentTurnScores.length > 0 && !isGameCompleted && (
+        {/* {isActive && currentTurnScores.length > 0 && !isGameCompleted && (
           <div className="bg-blue-900 border border-blue-700 p-3 rounded">
-            <div className="text-sm text-blue-400 mb-2">現在のターン ({currentThrow}/3投目)</div>
+            <div className="text-sm text-blue-400 mb-2">現在のターン</div>
             <div className="flex justify-center space-x-1">
               {[1, 2, 3].map(throwNum => (
                 <div key={throwNum} className="text-center">
@@ -134,7 +136,7 @@ export default function PlayerScoreCard({
               このターン計: <span className="font-bold">{currentTurnScores.reduce((a, b) => a + b, 0)}点</span>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* ターン履歴 */}
         <div className="space-y-2">
@@ -144,18 +146,55 @@ export default function PlayerScoreCard({
               <div className="text-gray-500 text-center text-sm">まだ投げていません</div>
             ) : (
               <div className="space-y-1">
+                {/* 現在のターン（進行中）- 一番上に表示 */}
+                {currentTurnScores.length > 0 && (
+                  <div className="border border-blue-500 rounded p-1 bg-blue-900/20">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-blue-400">現在のターン {turnHistory.length + 1}</span>
+                      <span className="font-bold text-blue-300 text-base w-12 text-right">{currentTurnScores.reduce((a, b) => a + b, 0)}点</span>
+                    </div>
+                    <div className="flex space-x-1">
+                      {currentTurnScores.map((score, throwIndex) => (
+                        <div
+                          key={throwIndex}
+                          className={`w-8 h-8 flex items-center justify-center rounded text-xs text-white transition-colors ${
+                            onStartEditHistoryData && !isGameCompleted
+                              ? 'bg-blue-600 hover:bg-blue-500 cursor-pointer'
+                              : 'bg-blue-600'
+                          }`}
+                          onClick={() => {
+                            if (onStartEditHistoryData && !isGameCompleted) {
+                              // 現在のターンはまだgamePlayDataに保存されていないため、
+                              // 特別な処理が必要。ここでは仮のターンインデックスを使用
+                              onStartEditHistoryData(playerIndex, -1, throwIndex);
+                            }
+                          }}
+                        >
+                          {score}
+                        </div>
+                      ))}
+                      {/* 残りの投数を表示 */}
+                      {Array.from({ length: 3 - currentTurnScores.length }).map((_, emptyIndex) => (
+                        <div key={`empty-${emptyIndex}`} className="w-8 h-8 flex items-center justify-center bg-gray-800 rounded text-xs text-gray-500 border border-dashed border-gray-500">
+                          ?
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 完了済みターンを表示（最新3つ） */}
                 {turnHistory.slice(-3).reverse().map((turn, index) => (
                   <div key={turnHistory.length - index} className="border-b border-gray-600 pb-1 last:border-b-0">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-gray-400">ターン {turnHistory.length - index}</span>
-                      <span className="font-bold text-white text-xs">{turn.reduce((a, b) => a + b, 0)}点</span>
+                      <span className="font-bold text-white text-base w-12 text-right">{turn.reduce((a, b) => a + b, 0)}点</span>
                     </div>
                     <div className="flex space-x-1">
                       {turn.map((score, throwIndex) => (
                         <div
                           key={throwIndex}
-                          className={`px-1 py-0.5 rounded text-xs transition-colors ${
+                          className={`w-8 h-8 flex items-center justify-center rounded text-xs transition-colors ${
                             onStartEditHistoryData && !isGameCompleted
                               ? 'bg-gray-600 hover:bg-gray-500 cursor-pointer'
                               : 'bg-gray-600'
@@ -172,36 +211,13 @@ export default function PlayerScoreCard({
                       ))}
                       {/* 空の投数を表示（3投未満の場合） */}
                       {Array.from({ length: 3 - turn.length }).map((_, emptyIndex) => (
-                        <div key={`empty-${emptyIndex}`} className="bg-gray-800 px-1 py-0.5 rounded text-xs text-gray-500">
+                        <div key={`empty-${emptyIndex}`} className="w-8 h-8 flex items-center justify-center bg-gray-800 rounded text-xs text-gray-500">
                           -
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
-
-                {/* 現在のターン（進行中） */}
-                {currentTurnScores.length > 0 && !isActive && (
-                  <div className="border border-blue-500 rounded p-1 bg-blue-900/20">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-blue-400">現在のターン {turnHistory.length + 1}</span>
-                      <span className="font-bold text-blue-300 text-xs">{currentTurnScores.reduce((a, b) => a + b, 0)}点</span>
-                    </div>
-                    <div className="flex space-x-1">
-                      {currentTurnScores.map((score, throwIndex) => (
-                        <div key={throwIndex} className="bg-blue-600 px-1 py-0.5 rounded text-xs text-white">
-                          {score}
-                        </div>
-                      ))}
-                      {/* 残りの投数を表示 */}
-                      {Array.from({ length: 3 - currentTurnScores.length }).map((_, emptyIndex) => (
-                        <div key={`empty-${emptyIndex}`} className="bg-gray-800 px-1 py-0.5 rounded text-xs text-gray-500 border border-dashed border-gray-500">
-                          ?
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
