@@ -40,12 +40,6 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
               <nav className="flex space-x-4">
                 <Link
-                  href="/"
-                  className={`px-3 py-2 rounded ${router.pathname === '/' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}
-                >
-                  ホーム
-                </Link>
-                <Link
                   href="/game/501"
                   className={`px-3 py-2 rounded ${router.pathname === '/game/501' ? 'bg-blue-600' : 'hover:bg-gray-700'}`}
                 >
