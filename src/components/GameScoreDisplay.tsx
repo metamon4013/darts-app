@@ -1,8 +1,13 @@
 import { Player } from './PlayerSetup';
 import PlayerScoreCard from './PlayerScoreCard';
 
+// プレイデータの型定義
+type PlayerTurn = number[]; // 1ターンの投数データ（例: [20, 30, 7]）
+type PlayerGameData = PlayerTurn[]; // 1人のプレイヤーの全ターンデータ
+type GamePlayData = PlayerGameData[]; // 全プレイヤーのプレイデータ
+
 interface GameScoreDisplayProps {
-  // シングルプレイヤー用props
+  // シングルプレイヤー用props（後方互換性のため）
   singlePlayerName?: string;
   singlePlayerScore?: number;
   singlePlayerGameHistory?: number[];
@@ -13,6 +18,10 @@ interface GameScoreDisplayProps {
   // マルチプレイヤー用props
   players?: Player[];
   currentPlayerIndex?: number;
+
+  // 新しい統一プレイデータ
+  gamePlayData?: GamePlayData;
+  currentTurnData?: number[];
 
   // 共通props
   gameCompleted: boolean;
@@ -29,22 +38,69 @@ export default function GameScoreDisplay({
   singlePlayerTurnHistory = [],
   players = [],
   currentPlayerIndex = 0,
+  gamePlayData = [],
+  currentTurnData = [],
   gameCompleted,
   winner,
   onReset
 }: GameScoreDisplayProps) {
+
+  // プレイヤーのスコアを計算する関数
+  const calculatePlayerScore = (playerIndex: number): number => {
+    if (gamePlayData[playerIndex]) {
+      const totalScored = gamePlayData[playerIndex].flat().reduce((sum, score) => sum + score, 0);
+      return 501 - totalScored;
+    }
+    // 後方互換性: マルチプレイヤーの場合はplayers配列から取得
+    if (players[playerIndex]) {
+      return players[playerIndex].score;
+    }
+    // シングルプレイヤーの場合
+    return singlePlayerScore || 501;
+  };
+
+  // プレイヤーのゲーム履歴を取得する関数
+  const getPlayerGameHistory = (playerIndex: number): number[] => {
+    if (gamePlayData[playerIndex]) {
+      return gamePlayData[playerIndex].flat();
+    }
+    // 後方互換性
+    if (players[playerIndex]) {
+      return players[playerIndex].gameHistory || [];
+    }
+    return singlePlayerGameHistory;
+  };
+
+  // プレイヤーのターン履歴を取得する関数
+  const getPlayerTurnHistory = (playerIndex: number): number[][] => {
+    if (gamePlayData[playerIndex]) {
+      return gamePlayData[playerIndex];
+    }
+    // 後方互換性
+    if (players[playerIndex]) {
+      return players[playerIndex].turnHistory || [];
+    }
+    return singlePlayerTurnHistory;
+  };
+
   // シングルプレイヤーの場合は仮想的なプレイヤー配列を作成
   const playersToDisplay = players.length === 0 ? [{
     id: 'single-player',
     name: singlePlayerName || 'プレイヤー1',
-    score: singlePlayerScore || 501,
-    gameHistory: singlePlayerGameHistory,
+    score: calculatePlayerScore(0),
+    gameHistory: getPlayerGameHistory(0),
     currentThrow: singlePlayerCurrentThrow,
-    currentTurnScores: singlePlayerCurrentTurnScores,
-    turnHistory: singlePlayerTurnHistory,
+    currentTurnScores: currentTurnData.length > 0 ? currentTurnData : singlePlayerCurrentTurnScores,
+    turnHistory: getPlayerTurnHistory(0),
     isActive: true,
-    isFinished: (singlePlayerScore || 501) === 0
-  }] : players;
+    isFinished: calculatePlayerScore(0) === 0
+  }] : players.map((player, index) => ({
+    ...player,
+    score: calculatePlayerScore(index),
+    gameHistory: getPlayerGameHistory(index),
+    turnHistory: getPlayerTurnHistory(index),
+    currentTurnScores: index === currentPlayerIndex && currentTurnData.length > 0 ? currentTurnData : (player.currentTurnScores || [])
+  }));
 
   const isMultiPlayer = players.length > 1;
 

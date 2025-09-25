@@ -13,6 +13,11 @@ interface BluetoothData {
   timestamp: number;
 }
 
+// プレイデータの型定義
+type PlayerTurn = number[]; // 1ターンの投数データ（例: [20, 30, 7]）
+type PlayerGameData = PlayerTurn[]; // 1人のプレイヤーの全ターンデータ
+type GamePlayData = PlayerGameData[]; // 全プレイヤーのプレイデータ
+
 declare global {
   interface Window {
     electronAPI: {
@@ -31,13 +36,28 @@ export default function Game501() {
   const [winner, setWinner] = useState<Player | null>(null);
   const [lastDartHit, setLastDartHit] = useState<DartHit | null>(null);
 
-  // シングルプレイヤー用
-  const [score, setScore] = useState(501);
-  const [gameHistory, setGameHistory] = useState<number[]>([]);
+  // 統一プレイデータ管理
+  const [gamePlayData, setGamePlayData] = useState<GamePlayData>([]);
+  const [currentTurnData, setCurrentTurnData] = useState<number[]>([]);
+  const [currentThrow, setCurrentThrow] = useState(1);
+
+  // シングルプレイヤー用の統計データ（後方互換性のため）
   const [dartHistory, setDartHistory] = useState<DartHit[]>([]);
-  const [currentThrow, setCurrentThrow] = useState(1); // 現在の投数（1-3）
-  const [currentTurnScores, setCurrentTurnScores] = useState<number[]>([]); // 現在のターンの投数
-  const [turnHistory, setTurnHistory] = useState<number[][]>([]); // ターンごとの履歴
+
+  // 現在のプレイヤースコアを計算する関数
+  const getCurrentPlayerScore = (playerIndex: number): number => {
+    if (!gamePlayData[playerIndex]) return 501;
+    const totalScored = gamePlayData[playerIndex]
+      .flat()
+      .reduce((sum, score) => sum + score, 0);
+    return 501 - totalScored;
+  };
+
+  // ゲーム履歴を取得する関数（後方互換性のため）
+  const getPlayerGameHistory = (playerIndex: number): number[] => {
+    if (!gamePlayData[playerIndex]) return [];
+    return gamePlayData[playerIndex].flat();
+  };
 
   const { isConnected } = useBluetoothContext();
 
@@ -67,146 +87,98 @@ export default function Game501() {
   const handleDartHit = (points: number, dartHit?: DartHit) => {
     if (gameCompleted) return;
 
-    // マルチプレイヤー処理
-    if (players.length > 1) {
-      const currentPlayer = players[currentPlayerIndex];
-      if (!currentPlayer || currentPlayer.isFinished) return;
+    const isMultiPlayer = players.length > 1;
+    const playerIndex = isMultiPlayer ? currentPlayerIndex : 0;
 
-      const newScore = currentPlayer.score - points;
+    // 現在のスコアを取得
+    const currentScore = getCurrentPlayerScore(playerIndex);
+    const newScore = currentScore - points;
 
-      // バーストチェック（0未満または1で終わる）
-      if (newScore < 0 || newScore === 1) {
-        console.log(`${currentPlayer.name} バースト！ターン終了`);
+    // バーストチェック（0未満または1で終わる）
+    if (newScore < 0 || newScore === 1) {
+      console.log(`${isMultiPlayer ? players[currentPlayerIndex]?.name : 'プレイヤー1'} バースト！ターン終了`);
 
-        // バースト時は現在のターンを履歴に追加してリセット
-        const updatedPlayers = [...players];
-        updatedPlayers[currentPlayerIndex] = {
-          ...currentPlayer,
-          currentThrow: 1, // リセット
-          isActive: false,
-          currentTurnScores: [], // バースト時もリセット
-          turnHistory: [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores]]
-        };
-        setPlayers(updatedPlayers);
-
-        // 次のプレイヤーに交代
-        nextPlayer();
-        return;
+      // バースト時: 現在のターンを記録して次のターンまたは次のプレイヤーへ
+      const newGamePlayData = [...gamePlayData];
+      if (!newGamePlayData[playerIndex]) {
+        newGamePlayData[playerIndex] = [];
       }
 
-      // プレイヤー情報を更新
-      const updatedPlayers = [...players];
-      const updatedCurrentPlayer = {
-        ...currentPlayer,
-        score: newScore,
-        gameHistory: [...currentPlayer.gameHistory, points],
-        dartHistory: dartHit ? [...currentPlayer.dartHistory, dartHit] : currentPlayer.dartHistory,
-        isFinished: newScore === 0,
-        currentTurnScores: [...currentPlayer.currentTurnScores, points]
+      // 現在のターンデータがあれば追加（バースト時でも記録）
+      if (currentTurnData.length > 0) {
+        newGamePlayData[playerIndex].push([...currentTurnData]);
+      }
+
+      setGamePlayData(newGamePlayData);
+      setCurrentTurnData([]);
+      setCurrentThrow(1);
+
+      if (isMultiPlayer) {
+        // マルチプレイヤー: 次のプレイヤーに交代
+        nextPlayer();
+      }
+      return;
+    }
+
+    // ダーツヒット情報を更新
+    if (dartHit) {
+      setDartHistory([...dartHistory, dartHit]);
+      setLastDartHit(dartHit);
+    }
+
+    // 現在のターンデータに追加
+    const newCurrentTurnData = [...currentTurnData, points];
+    setCurrentTurnData(newCurrentTurnData);
+
+    // ゲーム完了チェック
+    if (newScore === 0) {
+      // ゲーム完了時は現在のターンをプレイデータに追加
+      const newGamePlayData = [...gamePlayData];
+      if (!newGamePlayData[playerIndex]) {
+        newGamePlayData[playerIndex] = [];
+      }
+      newGamePlayData[playerIndex].push(newCurrentTurnData);
+      setGamePlayData(newGamePlayData);
+      setGameCompleted(true);
+
+      // winner設定
+      const winnerData = {
+        id: isMultiPlayer ? players[currentPlayerIndex].id : 'single-player',
+        name: isMultiPlayer ? players[currentPlayerIndex].name : 'プレイヤー1',
+        score: 0,
+        gameHistory: getPlayerGameHistory(playerIndex).concat(points),
+        isFinished: true,
+        isActive: false,
+        currentThrow: 1,
+        currentTurnScores: [],
+        turnHistory: newGamePlayData[playerIndex]
       };
+      setWinner(winnerData);
 
-      // ダーツヒット情報を更新
-      if (dartHit) {
-        setLastDartHit(dartHit);
-      }
+      console.log(`${winnerData.name} ゲーム完了！`);
+      return;
+    }
 
-      // ゲーム完了チェック
-      if (newScore === 0) {
-        updatedCurrentPlayer.isFinished = true;
-        // ゲーム完了時も現在のターンを履歴に追加
-        updatedCurrentPlayer.turnHistory = [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores, points]];
-        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
-        setPlayers(updatedPlayers);
-        setWinner(updatedCurrentPlayer);
-        setGameCompleted(true);
-        console.log(`${currentPlayer.name} ゲーム完了！`);
-        return;
-      }
-
-      // 3投目まで続ける
-      if (currentPlayer.currentThrow < 3) {
-        // 次の投数に進む
-        updatedCurrentPlayer.currentThrow = currentPlayer.currentThrow + 1;
-        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
-        setPlayers(updatedPlayers);
-        console.log(`${currentPlayer.name} - ${updatedCurrentPlayer.currentThrow}投目`);
-      } else {
-        // 3投目完了 - 次のプレイヤーに交代
-        updatedCurrentPlayer.currentThrow = 1; // リセット
-        updatedCurrentPlayer.isActive = false;
-        updatedCurrentPlayer.turnHistory = [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores, points]]; // ターン履歴に追加
-        updatedCurrentPlayer.currentTurnScores = []; // ターン終了でリセット
-        updatedPlayers[currentPlayerIndex] = updatedCurrentPlayer;
-        setPlayers(updatedPlayers);
-
-        console.log(`${currentPlayer.name} のターン終了`);
-        nextPlayer();
-      }
-
+    // ターン管理（3投まで）
+    if (currentThrow < 3) {
+      // 次の投数に進む
+      setCurrentThrow(currentThrow + 1);
+      console.log(`${isMultiPlayer ? players[currentPlayerIndex]?.name : 'プレイヤー1'} - ${currentThrow + 1}投目`);
     } else {
-      // シングルプレイヤー処理
-      const newScore = score - points;
-
-      // バーストチェック（0未満または1で終わる）
-      if (newScore < 0 || newScore === 1) {
-        console.log('バースト！ターン終了');
-
-        // バースト時は現在のターンをリセットして次のターンへ
-        const newTurnHistory = [...turnHistory, [...currentTurnScores]];
-        setTurnHistory(newTurnHistory);
-        setCurrentTurnScores([]);
-        setCurrentThrow(1);
-        return;
+      // 3投目完了 - ターンを完了してプレイデータに追加
+      const newGamePlayData = [...gamePlayData];
+      if (!newGamePlayData[playerIndex]) {
+        newGamePlayData[playerIndex] = [];
       }
+      newGamePlayData[playerIndex].push(newCurrentTurnData);
+      setGamePlayData(newGamePlayData);
+      setCurrentTurnData([]);
+      setCurrentThrow(1);
 
-      // スコアと履歴を更新
-      const newCurrentTurnScores = [...currentTurnScores, points];
-      setScore(newScore);
-      setGameHistory([...gameHistory, points]);
-      setCurrentTurnScores(newCurrentTurnScores);
-
-      // ダーツヒット履歴を更新
-      if (dartHit) {
-        setDartHistory([...dartHistory, dartHit]);
-        setLastDartHit(dartHit);
-      }
-
-      // ゲーム完了チェック
-      if (newScore === 0) {
-        // ゲーム完了時は現在のターンも履歴に追加
-        const finalTurnHistory = [...turnHistory, newCurrentTurnScores];
-        setTurnHistory(finalTurnHistory);
-        setGameCompleted(true);
-
-        // シングルプレイヤー用のwinner設定
-        const singlePlayerWinner = {
-          id: 'single-player',
-          name: 'プレイヤー1',
-          score: 0,
-          gameHistory: [...gameHistory, points],
-          isFinished: true,
-          isActive: false,
-          currentThrow: 1,
-          currentTurnScores: [],
-          turnHistory: finalTurnHistory
-        };
-        setWinner(singlePlayerWinner);
-
-        console.log('ゲーム完了！');
-        return;
-      }
-
-      // ターン管理（3投まで）
-      if (currentThrow < 3) {
-        // 次の投数に進む
-        setCurrentThrow(currentThrow + 1);
-        console.log(`${currentThrow + 1}投目`);
+      if (isMultiPlayer) {
+        console.log(`${players[currentPlayerIndex]?.name} のターン終了`);
+        nextPlayer();
       } else {
-        // 3投目完了 - 次のターンへ
-        const newTurnHistory = [...turnHistory, newCurrentTurnScores];
-        setTurnHistory(newTurnHistory);
-        setCurrentTurnScores([]);
-        setCurrentThrow(1);
         console.log('ターン終了 - 次のターンへ');
       }
     }
@@ -220,15 +192,12 @@ export default function Game501() {
     setWinner(null);
     setLastDartHit(null);
 
-    // シングルプレイヤーの場合は既存のstateも更新
-    if (newPlayers.length === 1) {
-      setScore(501);
-      setGameHistory([]);
-      setDartHistory([]);
-      setCurrentThrow(1);
-      setCurrentTurnScores([]);
-      setTurnHistory([]);
-    }
+    // 統一プレイデータをリセット
+    const initialGamePlayData: GamePlayData = new Array(newPlayers.length).fill(null).map(() => []);
+    setGamePlayData(initialGamePlayData);
+    setCurrentTurnData([]);
+    setCurrentThrow(1);
+    setDartHistory([]);
   };
 
   const resetGame = () => {
@@ -239,63 +208,41 @@ export default function Game501() {
     setWinner(null);
     setLastDartHit(null);
 
-    // シングルプレイヤー用のstateもリセット
-    setScore(501);
-    setGameHistory([]);
-    setDartHistory([]);
+    // 統一プレイデータをリセット
+    setGamePlayData([]);
+    setCurrentTurnData([]);
     setCurrentThrow(1);
-    setCurrentTurnScores([]);
-    setTurnHistory([]);
+    setDartHistory([]);
   };
 
   const nextPlayer = () => {
-    if (gameCompleted) return;
-
-    const currentPlayer = players[currentPlayerIndex];
-    if (!currentPlayer) return;
-
-    // 現在のプレイヤーの投数を3に設定（ターン終了）
-    const updatedPlayersWithThrowReset = [...players];
-    updatedPlayersWithThrowReset[currentPlayerIndex] = {
-      ...currentPlayer,
-      currentThrow: 1, // 次のターンで1投目から
-      isActive: false,
-      turnHistory: currentPlayer.currentTurnScores.length > 0
-        ? [...currentPlayer.turnHistory, [...currentPlayer.currentTurnScores]]
-        : currentPlayer.turnHistory, // 現在のターンがあれば履歴に追加
-      currentTurnScores: [] // ターン終了でリセット
-    };
+    if (gameCompleted || players.length <= 1) return;
 
     // 次のプレイヤーを探す
     let nextIndex = (currentPlayerIndex + 1) % players.length;
 
-    // 完了していないプレイヤーを探す
-    const activePlayers = players.filter(p => !p.isFinished);
+    // 完了していないプレイヤーを探す（新しいデータ構造でチェック）
+    const activePlayers = players.filter((_, index) => getCurrentPlayerScore(index) > 0);
     if (activePlayers.length <= 1) {
-      // ゲーム終了
-      const finishedPlayer = players.find(p => p.isFinished);
-      if (finishedPlayer) {
-        setWinner(finishedPlayer);
-        setGameCompleted(true);
-      }
+      // ゲーム終了処理は既にhandleDartHitで行われている
       return;
     }
 
     // 次のアクティブなプレイヤーを見つける
-    while (updatedPlayersWithThrowReset[nextIndex].isFinished && nextIndex !== currentPlayerIndex) {
+    while (getCurrentPlayerScore(nextIndex) <= 0 && nextIndex !== currentPlayerIndex) {
       nextIndex = (nextIndex + 1) % players.length;
     }
 
-    // 次のプレイヤーをアクティブにして、1投目から開始
-    updatedPlayersWithThrowReset[nextIndex] = {
-      ...updatedPlayersWithThrowReset[nextIndex],
-      isActive: true,
-      currentThrow: 1,
-      currentTurnScores: [] // 新しいターンで空からスタート
-    };
+    // プレイヤーを更新（isActiveフラグのみ変更）
+    const updatedPlayers = players.map((player, index) => ({
+      ...player,
+      isActive: index === nextIndex,
+      currentThrow: index === nextIndex ? 1 : player.currentThrow
+    }));
 
-    setPlayers(updatedPlayersWithThrowReset);
+    setPlayers(updatedPlayers);
     setCurrentPlayerIndex(nextIndex);
+    setCurrentThrow(1);
   };
 
   // Bluetooth data listener
@@ -329,7 +276,7 @@ export default function Game501() {
         window.electronAPI.removeBluetoothDataListener(handleBluetoothData);
       };
     }
-  }, [isConnected, score, gameHistory, dartHistory, gameCompleted]);
+  }, [isConnected, gamePlayData, currentTurnData, dartHistory, gameCompleted]);
 
   // ゲーム設定画面
   if (gameMode === 'setup') {
@@ -374,16 +321,18 @@ export default function Game501() {
           <div className="w-full max-w-6xl">
             <GameScoreDisplay
               singlePlayerName="プレイヤー1"
-              singlePlayerScore={score}
-              singlePlayerGameHistory={gameHistory}
+              singlePlayerScore={getCurrentPlayerScore(0)}
+              singlePlayerGameHistory={getPlayerGameHistory(0)}
               singlePlayerCurrentThrow={currentThrow}
-              singlePlayerCurrentTurnScores={currentTurnScores}
-              singlePlayerTurnHistory={turnHistory}
+              singlePlayerCurrentTurnScores={currentTurnData}
+              singlePlayerTurnHistory={gamePlayData[0] || []}
               players={players}
               currentPlayerIndex={currentPlayerIndex}
               gameCompleted={gameCompleted}
               winner={winner || undefined}
               onReset={resetGame}
+              gamePlayData={gamePlayData}
+              currentTurnData={currentTurnData}
             />
           </div>
         </div>
